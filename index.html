@@ -119,6 +119,25 @@
   .post .txt { white-space: pre-wrap; margin-top: 4px; overflow-wrap: anywhere; }
   .reply.card { padding: 12px 14px; margin-bottom: 8px; }
   .post.mine .by strong::after { content: ' (you)'; font-weight: 400; color: var(--muted); }
+  .seg { display: flex; background: var(--chip); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
+  .seg button { flex: 1; border: 0; background: none; padding: 9px 6px; border-radius: 10px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--surface); color: var(--forest); box-shadow: var(--shadow); }
+  .notice .head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+  .notice .kind { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--chip); color: var(--forest); }
+  .notice .kind.k-sale { background: #e6f2ea; color: #2f7d4a; }
+  .notice .kind.k-wanted { background: #e8f2fb; color: #1a6aa0; }
+  .notice .sold-tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--red); color: #fff; }
+  .notice .tt { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .notice .tt b { font-size: 17px; overflow-wrap: anywhere; }
+  .notice .price { font-weight: 700; color: var(--forest-2); white-space: nowrap; }
+  .notice .txt { white-space: pre-wrap; margin-top: 4px; overflow-wrap: anywhere; }
+  .notice .meta { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .notice .contact { margin-top: 6px; font-size: 14px; overflow-wrap: anywhere; }
+  .notice .own { display: flex; gap: 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .notice .own button { border: 0; background: none; padding: 2px 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--forest-2); cursor: pointer; }
+  .notice .own button.danger { color: var(--red); }
+  .notice.is-sold .tt b, .notice.is-sold .price { text-decoration: line-through; opacity: .6; }
+  @media (prefers-color-scheme: dark) { .notice .kind.k-sale { background: #1d3a27; color: #8fd0a4; } .notice .kind.k-wanted { background: #16314a; color: #9cc6e8; } }
 
   /* Club */
   .club-sec h2 { font-size: 21px; color: var(--forest); margin-bottom: 6px; }
@@ -387,8 +406,8 @@
 <script>
 (function () {
   'use strict';
-  var PAGE_VERSION = '3.4';
-  var NEEDS_SERVER = '3.4';  // oldest Code.gs this page works with
+  var PAGE_VERSION = '3.5';
+  var NEEDS_SERVER = '3.5';  // oldest Code.gs this page works with
 
   /* ---------- where the app is running ---------- */
   // Inside Google (the old /exec link) the page talks to the script directly.
@@ -677,7 +696,8 @@
     { id: 'events', label: 'New club events', desc: 'When something like the AGM or a social is added.' },
     { id: 'weekly', label: 'Weekly round-up', desc: 'Sunday evening: the week ahead and how many are going to each.' },
     { id: 'forum', label: 'Forum replies', desc: 'When someone replies to a question you asked or answered.' },
-    { id: 'newq', label: 'New forum questions', desc: 'Whenever anyone asks a new question. Off unless you tick it.', optIn: true }
+    { id: 'newq', label: 'New forum questions', desc: 'Whenever anyone asks a new question. Off unless you tick it.', optIn: true },
+    { id: 'notices', label: 'New notices', desc: 'Kit for sale, wanted, lifts and lost & found. Off unless you tick it.', optIn: true }
   ];
   function handoffUrl() {
     var p = [['k', store.get('ac_code')], ['t', TOKEN], ['n', store.get('ac_name')]]
@@ -1143,12 +1163,18 @@
   }
 
   /* ---------- forum ---------- */
+  function forumSeg() {
+    var v = S.forumView || 'questions', n = (S.data.notices || []).length;
+    return '<div class="seg"><button class="' + (v === 'questions' ? 'on' : '') + '" data-act="forumView" data-v="questions">Questions</button>' +
+      '<button class="' + (v === 'notices' ? 'on' : '') + '" data-act="forumView" data-v="notices">Notices' + (n ? ' (' + n + ')' : '') + '</button></div>';
+  }
   function renderForum() {
     var d = S.data;
     var open = S.thread && d.forum.filter(function (x) { return x.id === S.thread; })[0];
     if (S.thread && !open) S.thread = null;
     if (open) return renderThread(open);
-    var h = searchBox('forumSearch', 'Search questions and answers', S.forumQuery);
+    if (S.forumView === 'notices' && d.notices) return forumSeg() + renderNotices();
+    var h = (d.notices ? forumSeg() : '') + searchBox('forumSearch', 'Search questions and answers', S.forumQuery);
     h += '<details class="ask"' + (S.openForm === 'forumNew' ? ' open' : '') + ' data-form="forumNew"><summary>＋ Ask a question</summary><div class="form">' +
       '<label>Question<input id="fqTitle" maxlength="120" placeholder="e.g. What poundage should a beginner start with?"></label>' +
       '<label>More details (optional)<textarea id="fqText" maxlength="3000" placeholder="Anything that helps people answer"></textarea></label>' +
@@ -1176,6 +1202,42 @@
       (canDelete ? '<button class="del" data-act="forumDelete" data-id="' + esc(p.id) + '" data-q="' + (isQuestion ? 1 : 0) + '">Delete</button>' : '') + '</div>' +
       '<div class="txt">' + esc(p.text) + '</div></div>';
   }
+  /* ---------- notice board ---------- */
+  function renderNotices() {
+    var d = S.data, kinds = d.noticeKinds || [];
+    var h = '<details class="ask"' + (S.openForm === 'noticeNew' ? ' open' : '') + ' data-form="noticeNew"><summary>＋ Post a notice</summary><div class="form">' +
+      '<label>Type<select id="nKind">' + kinds.map(function (k) { return '<option>' + esc(k) + '</option>'; }).join('') + '</select></label>' +
+      '<label>Title<input id="nTitle" maxlength="100" placeholder="e.g. Hoyt riser, 25 inch, left hand"></label>' +
+      '<label>Price (optional)<input id="nPrice" maxlength="30" placeholder="e.g. €150 or nearest offer"></label>' +
+      '<label>Details (optional)<textarea id="nDetails" maxlength="1500" placeholder="Condition, size, draw weight…"></textarea></label>' +
+      '<label>How to contact you (optional)<input id="nContact" maxlength="80" placeholder="e.g. 087 123 4567, or “ask me at practice”"></label>' +
+      '<p class="hint" style="margin:0">Everyone in the club can see this, including any phone number you add. Notices are removed after ' + (d.noticeDays || 60) + ' days.</p>' +
+      '<button class="btn primary" data-act="noticePost">Post notice</button></div></details>';
+    var f = S.noticeFilter || 'All';
+    var present = kinds.filter(function (k) { return d.notices.some(function (n) { return n.kind === k; }); });
+    if (present.length > 1) {
+      h += '<div class="filters">' + ['All'].concat(present).map(function (k) {
+        return '<button class="' + (f === k ? 'on' : '') + '" data-act="noticeFilter" data-k="' + esc(k) + '">' + esc(k) + '</button>';
+      }).join('') + '</div>';
+    }
+    var list = d.notices.filter(function (n) { return f === 'All' || n.kind === f; });
+    if (!list.length) return h + '<div class="card"><div class="empty">No notices at the moment. Selling old kit, looking for something, or offering a lift? Post it here.</div></div>';
+    return h + list.map(function (n) {
+      var cls = n.kind === 'For sale' ? ' k-sale' : n.kind === 'Wanted' ? ' k-wanted' : '';
+      var doneWord = n.kind === 'For sale' ? 'sold' : n.kind === 'Lost & found' ? 'found' : 'done';
+      var own = n.mine || S.pin;
+      return '<div class="card notice' + (n.sold ? ' is-sold' : '') + '">' +
+        '<div class="head"><span class="kind' + cls + '">' + esc(n.kind) + '</span>' + (n.sold ? '<span class="sold-tag">' + doneWord.toUpperCase() + '</span>' : '') + '</div>' +
+        '<div class="tt"><b>' + esc(n.title) + '</b>' + (n.price ? '<span class="price">' + esc(n.price) + '</span>' : '') + '</div>' +
+        (n.details ? '<div class="txt">' + esc(n.details) + '</div>' : '') +
+        (n.contact ? '<div class="contact">📞 ' + esc(n.contact) + '</div>' : '') +
+        '<div class="meta">' + esc(n.name) + (n.mine ? ' (you)' : '') + ' · ' + esc(fmtTs(n.ts)) + (n.mine ? ' · removed in ' + n.daysLeft + (n.daysLeft === 1 ? ' day' : ' days') : '') + '</div>' +
+        (own ? '<div class="own"><button data-act="noticeSold" data-id="' + esc(n.id) + '" data-sold="' + (n.sold ? 0 : 1) + '">' + (n.sold ? 'Not ' + doneWord + ' after all' : 'Mark as ' + doneWord) + '</button>' +
+          '<button class="danger" data-act="noticeDelete" data-id="' + esc(n.id) + '">Remove</button></div>' : '') +
+        '</div>';
+    }).join('');
+  }
+
   function renderThread(th) {
     var h = '<button class="back" data-act="closeThread">‹ All questions</button>';
     h += '<article class="card thread"><h2>' + esc(th.title) + '</h2>' + postHtml(th, true) + '</article>';
@@ -1436,6 +1498,35 @@
         act(function () { return call('forumDelete', TOKEN, postId, S.pin || ''); }, 'Deleted', function (d) {
           if (isQ) { d.forum = d.forum.filter(function (x) { return x.id !== postId; }); if (S.thread === postId) S.thread = null; }
           else d.forum.forEach(function (x) { x.replies = x.replies.filter(function (r) { return r.id !== postId; }); });
+        });
+      });
+    } else if (a === 'forumView') {
+      S.forumView = el.getAttribute('data-v'); S.openForm = null; render();
+    } else if (a === 'noticeFilter') {
+      S.noticeFilter = el.getAttribute('data-k'); render();
+    } else if (a === 'noticePost') {
+      var nv = { kind: $('nKind').value, title: $('nTitle').value.trim(), price: $('nPrice').value.trim(),
+        details: $('nDetails').value.trim(), contact: $('nContact').value.trim() };
+      if (!nv.title) { toast('Please give the notice a title', true); $('nTitle').focus(); return; }
+      var nBtn = el;
+      withName(function (nm) {
+        busyButton(nBtn);
+        act(function () { return call('noticeAdd', TOKEN, nm, nv); }, 'Notice posted').then(function (ok) {
+          if (ok) { S.openForm = null; S.noticeFilter = 'All'; render(); }
+          else if (nBtn.isConnected) { nBtn.disabled = false; nBtn.textContent = 'Post notice'; }
+        });
+      });
+    } else if (a === 'noticeSold') {
+      var nId = el.getAttribute('data-id'), nSold = el.getAttribute('data-sold') === '1';
+      act(function () { return call('noticeSold', TOKEN, nId, nSold, S.pin || ''); }, nSold ? el.textContent.replace('Mark as', 'Marked as') : 'Updated', function (d) {
+        d.notices.forEach(function (n) { if (n.id === nId) n.sold = nSold; });
+      });
+    } else if (a === 'noticeDelete') {
+      var dId = el.getAttribute('data-id');
+      ask({ title: 'Remove this notice?', ok: 'Remove', danger: true }).then(function (yes) {
+        if (!yes) return;
+        act(function () { return call('noticeDelete', TOKEN, dId, S.pin || ''); }, 'Removed', function (d) {
+          d.notices = d.notices.filter(function (n) { return n.id !== dId; });
         });
       });
     } else if (a === 'copy') {
