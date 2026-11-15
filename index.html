@@ -387,8 +387,8 @@
 <script>
 (function () {
   'use strict';
-  var PAGE_VERSION = '3.3';
-  var NEEDS_SERVER = '3.3';  // oldest Code.gs this page works with
+  var PAGE_VERSION = '3.4';
+  var NEEDS_SERVER = '3.4';  // oldest Code.gs this page works with
 
   /* ---------- where the app is running ---------- */
   // Inside Google (the old /exec link) the page talks to the script directly.
@@ -676,7 +676,8 @@
     { id: 'today', label: 'On-the-day reminder', desc: 'Between 8 and 9am on the day of a session or club event, with how many are going.' },
     { id: 'events', label: 'New club events', desc: 'When something like the AGM or a social is added.' },
     { id: 'weekly', label: 'Weekly round-up', desc: 'Sunday evening: the week ahead and how many are going to each.' },
-    { id: 'forum', label: 'Forum replies', desc: 'When someone replies to a question you asked or answered.' }
+    { id: 'forum', label: 'Forum replies', desc: 'When someone replies to a question you asked or answered.' },
+    { id: 'newq', label: 'New forum questions', desc: 'Whenever anyone asks a new question. Off unless you tick it.', optIn: true }
   ];
   function handoffUrl() {
     var p = [['k', store.get('ac_code')], ['t', TOKEN], ['n', store.get('ac_name')]]
@@ -733,7 +734,10 @@
     }).then(function (fcm) {
       if (!fcm) throw new Error('Couldn’t set up notifications. Please try again.');
       store.set('ac_fcm', fcm);
-      var prefs = S.data.push.types.slice();
+      // Everything on to start with, apart from the opt-in ones
+      var prefs = S.data.push.types.filter(function (id) {
+        return !PUSH_TYPES.some(function (t) { return t.id === id && t.optIn; });
+      });
       return act(function () { return call('pushSave', TOKEN, fcm, prefs); }, 'Notifications on');
     }).catch(function (e) {
       toast(errMsg(e), true); render();
@@ -764,7 +768,7 @@
     function typeList(disabled) {
       return PUSH_TYPES.map(function (t) {
         var live = (p.types || []).indexOf(t.id) >= 0;
-        var on = live && (p.prefs || []).indexOf(t.id) >= 0;
+        var on = live && (p.on ? (p.prefs || []).indexOf(t.id) >= 0 : !t.optIn);
         return '<label class="ntype' + (live ? '' : ' soon') + '"><input type="checkbox" data-type="' + t.id + '"' +
           (on ? ' checked' : '') + (live && !disabled ? '' : ' disabled') + '>' +
           '<div><b>' + esc(t.label) + (live ? '' : '<span class="soon-tag">Coming soon</span>') + '</b><span>' + esc(t.desc) + '</span></div></label>';
