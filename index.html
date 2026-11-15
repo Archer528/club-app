@@ -387,8 +387,8 @@
 <script>
 (function () {
   'use strict';
-  var PAGE_VERSION = '3.2.1';
-  var NEEDS_SERVER = '3.2';  // oldest Code.gs this page works with
+  var PAGE_VERSION = '3.3';
+  var NEEDS_SERVER = '3.3';  // oldest Code.gs this page works with
 
   /* ---------- where the app is running ---------- */
   // Inside Google (the old /exec link) the page talks to the script directly.
@@ -673,10 +673,10 @@
   /* ---------- notifications ---------- */
   var PUSH_TYPES = [
     { id: 'cancel', label: 'Session cancelled or back on', desc: 'When practice or 3D in the woods is called off, or back on.' },
-    { id: 'today', label: 'On-the-day reminder', desc: 'The morning of a session, with how many are going.' },
+    { id: 'today', label: 'On-the-day reminder', desc: 'Between 8 and 9am on the day of a session or club event, with how many are going.' },
     { id: 'events', label: 'New club events', desc: 'When something like the AGM or a social is added.' },
-    { id: 'weekly', label: 'Weekly sign-up reminder', desc: 'When next week’s sessions open.' },
-    { id: 'forum', label: 'Forum replies', desc: 'When someone answers your question.' }
+    { id: 'weekly', label: 'Weekly round-up', desc: 'Sunday evening: the week ahead and how many are going to each.' },
+    { id: 'forum', label: 'Forum replies', desc: 'When someone replies to a question you asked or answered.' }
   ];
   function handoffUrl() {
     var p = [['k', store.get('ac_code')], ['t', TOKEN], ['n', store.get('ac_name')]]
@@ -809,7 +809,7 @@
         'Open the app from that icon and it will remember your club code and name' + (IN_GAS ? '' : ', and can send you notifications') + '.</div>';
     }
     if (IN_GAS && d.appUrl) {
-      h += '<div class="card move-card"><strong>New: notifications</strong><br>Get told straight away when a session is cancelled. ' +
+      h += '<div class="card move-card"><strong>New: notifications</strong><br>Get reminders, cancellations, new events and forum replies on your phone. ' +
         'Open the new version of the app, then add it to your home screen.' +
         '<br><a class="btn primary" target="_blank" rel="noopener" href="' + esc(handoffUrl()) + '">Open the new app</a></div>';
     }
