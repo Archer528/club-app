@@ -176,6 +176,8 @@
   details.myround summary::-webkit-details-marker { display: none; }
   .offline-bar { background: #fff4d6; color: #5c4400; border: 1px solid #f2d27a; border-radius: 12px; padding: 8px 12px; font-size: 14px; margin-bottom: 12px; }
   @media (prefers-color-scheme: dark) { .offline-bar { background: #3d3214; color: #f5dc94; border-color: #6b5a24; } }
+  .add-others { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 6px; }
+  .add-others .linkish { text-decoration: none; color: var(--forest-2); font-weight: 600; padding: 4px 0; }
   .seg { display: flex; background: var(--chip); border-radius: 12px; padding: 3px; margin-bottom: 12px; }
   .seg button { flex: 1; border: 0; background: none; padding: 9px 6px; border-radius: 10px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; }
   .seg button.on { background: var(--surface); color: var(--forest); box-shadow: var(--shadow); }
@@ -463,8 +465,8 @@
 <script>
 (function () {
   'use strict';
-  var PAGE_VERSION = '3.6';
-  var NEEDS_SERVER = '3.6';  // oldest Code.gs this page works with
+  var PAGE_VERSION = '3.7';
+  var NEEDS_SERVER = '3.7';  // oldest Code.gs this page works with
 
   /* ---------- where the app is running ---------- */
   // Inside Google (the old /exec link) the page talks to the script directly.
@@ -975,11 +977,31 @@
     return h;
   }
 
+  // Names this phone has put down for other people (e.g. children), for one-tap adding
+  function othersGet() { try { return JSON.parse(store.get('ac_others') || '[]') || []; } catch (e) { return []; } }
+  function othersRemember(nm) {
+    var list = othersGet().filter(function (x) { return x.toLowerCase() !== nm.toLowerCase(); });
+    list.unshift(nm); store.set('ac_others', JSON.stringify(list.slice(0, 6)));
+  }
+  // "Me" is this phone's own name; other names this phone added are people it signed up
+  function myEntry(s) {
+    var me = (store.get('ac_name') || '').trim().toLowerCase();
+    return s.names.filter(function (n) { return n.mine && (!me || n.name.trim().toLowerCase() === me); })[0];
+  }
+  function addOthersHtml(s) {
+    var down = s.names.map(function (n) { return n.name.trim().toLowerCase(); });
+    var me = (store.get('ac_name') || '').trim().toLowerCase();
+    var quick = othersGet().filter(function (x) { var l = x.toLowerCase(); return down.indexOf(l) < 0 && l !== me; });
+    return '<div class="add-others">' + quick.map(function (x) {
+      return '<button class="linkish" data-act="addKnown" data-key="' + esc(s.key) + '" data-name="' + esc(x) + '">＋ ' + esc(x) + '</button>';
+    }).join('') + '<button class="linkish" data-act="addOther" data-key="' + esc(s.key) + '">＋ Add someone else</button></div>';
+  }
+
   // One sign-up card: a regular session, or a club event that takes sign-ups
   function signupCard(s, tomorrow) {
     var d = S.data, isEvent = !s.code;
     var dt = parseD(s.date);
-    var mine = s.names.filter(function (n) { return n.mine; })[0];
+    var mine = myEntry(s);
     var tag = s.date === d.today ? '<span class="tag-today">TODAY</span>' : s.date === tomorrow ? '<span class="tag-today">TOMORROW</span>' : '';
     var title = isEvent ? s.title : s.label;
     var meta = isEvent ? [s.time, s.location].filter(Boolean).join(' · ') : (s.time + (s.place ? ' · ' + s.place : ''));
@@ -1006,7 +1028,7 @@
       (S.pin && !isEvent ? (s.cancelled
         ? '<button class="btn ghost small" data-act="reinstate" data-key="' + esc(s.key) + '">Reinstate session</button>'
         : '<button class="btn danger small" data-act="cancelSession" data-key="' + esc(s.key) + '">Cancel session</button>') : '') +
-      '</div></div></article>';
+      '</div>' + (s.cancelled ? '' : addOthersHtml(s)) + '</div></article>';
   }
 
   function regularFor(dateStr) {
@@ -1028,7 +1050,7 @@
   }
   function goingControls(s) {
     var n = s.names.length, open = S.showGoing === s.key;
-    var mine = s.names.filter(function (x) { return x.mine; })[0];
+    var mine = myEntry(s);
     var h = '<button class="going-toggle' + (open ? ' open' : '') + '" data-act="toggleGoing" data-key="' + esc(s.key) + '"' + (n ? '' : ' disabled') + '>' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5M16 4.8a3.5 3.5 0 0 1 0 6.4M18.5 14.8c1.6.8 2.6 2.6 3 5.2"/></svg>' +
       '<strong>' + n + '</strong> going' + (n ? '<span class="chev">▾</span>' : '') + '</button>';
@@ -1039,7 +1061,7 @@
     }
     h += '<div class="actions" style="margin-top:8px">' + (mine
       ? '<button class="btn going small" data-act="remove" data-key="' + esc(s.key) + '" data-name="' + esc(mine.name) + '">✓ You’re going · cancel</button>'
-      : '<button class="btn primary small" data-act="join" data-key="' + esc(s.key) + '">I’m going</button>') + '</div>';
+      : '<button class="btn primary small" data-act="join" data-key="' + esc(s.key) + '">I’m going</button>') + '</div>' + addOthersHtml(s);
     return h;
   }
   function eventsFor(dateStr) {
@@ -1674,6 +1696,17 @@
         store.set('ac_name', nm);
         act(function () { return call('signUp', key, nm, TOKEN); }, 'You’re down — see you there!', addMe(key, nm));
       });
+    } else if (a === 'addOther' || a === 'addKnown') {
+      var putDown = function (who) {
+        who = String(who || '').trim().slice(0, 40);
+        if (!who) return;
+        if (who.toLowerCase() === (store.get('ac_name') || '').trim().toLowerCase()) { toast('That’s your own name: use I’m going', true); return; }
+        othersRemember(who);
+        act(function () { return call('signUp', key, who, TOKEN, true); }, who + ' is down', addMe(key, who));
+      };
+      if (a === 'addKnown') putDown(el.getAttribute('data-name'));
+      else ask({ title: 'Add someone else', text: 'For example your child. You can take them off again from this phone.', ok: 'Put them down',
+        input: { placeholder: 'Their full name' } }).then(putDown);
     } else if (a === 'remove') {
       var nm = el.getAttribute('data-name');
       ask({ title: 'Take ' + nm + ' off?', text: 'They’ll be removed from this session.', ok: 'Remove', danger: true }).then(function (yes) {
